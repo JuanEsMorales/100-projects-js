@@ -13,33 +13,80 @@
     canvas {
       border: 3px solid #fff;
       border-bottom: transparent;
-      background-color: #000;
+      background: url('./bkg.png') repeat;
       margin: 0 auto;
       display: block;
     }
   </style>
-  <canvas>
+  <canvas></canvas>
 
-  </canvas>
+  <img id="sprite" hidden src="./sprite.png" alt="">
+  <img id="bricks" hidden src="./bricks.png" alt="">
 </body>
 <script>
   const canvas = document.querySelector('canvas')
   const ctx = canvas.getContext('2d')
+  const sprite = document.querySelector('#sprite')
+  const bricks = document.querySelector('#bricks')
 
   canvas.width = 448
   canvas.height = 400
 
   /* variables del juego */
-
-  /* varibles de la pelolta */
+  let gameOver = false
+  let leftPressed = false
+  let rightPressed = false
+  /* varibles de la pelota */
   const ballRadius = 6
   // posicion
   let x = canvas.width / 2
   let y = canvas.height - 30
 
   // velocidad de la pelota
-  let dx = -2
-  let dy = -2
+  let dx = 3
+  let dy = -3
+
+  /* Variables del paddle */
+  const paddleHeight = 10
+  const paddleWidth = 50
+  const PADDLE_SENSITIVITY = 8
+
+  let paddleX = (canvas.width - paddleWidth) / 2
+  let paddleY = canvas.height - paddleHeight - 10
+  /* Varibles de los ladrillos */
+  const brickRowCount = 6
+  const brickColumnCount = 13
+  const brickWidth = 30
+  const brickHeight = 14
+  const brickPadding = 2
+  const brickOffsetTop = 80
+  const brickOffsetLeft = 16
+  const allBricks = [] 
+
+  const BRICK_STATUS = {
+    ACTIVE: 1,
+    DESTROYED: 0
+  }
+
+  for (let c = 0; c < brickColumnCount; c++) {
+    allBricks[c] = [] // inicializa con un array vacio
+    for (let r = 0; r < brickRowCount; r++) {
+      // calcular la posición de cada ladrillo en la pantalla
+      const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft
+      const brickY = r * (brickHeight + brickPadding) + brickOffsetTop
+
+      // asignar un color random a cada ladrillo
+      const random = Math.floor(Math.random() * 8)
+      // guardar la información de cada ladrillo
+      allBricks[c][r] = {
+        x: brickX,
+        y: brickY,
+        status: BRICK_STATUS.ACTIVE,
+        color: random
+      }
+    }
+    
+  }
 
 
   function drawBall() {
@@ -49,10 +96,58 @@
     ctx.fill()
     ctx.closePath()
   }
-  function drawPaddle() {}
-  function drawBricks() {}
+  function drawPaddle() {
+    ctx.drawImage(
+      sprite,
+      29,
+      174,
+      paddleWidth,
+      paddleHeight,
+      paddleX,
+      paddleY,
+      paddleWidth,
+      paddleHeight
+    )
+  }
+  function drawBricks() {
+    for (let c = 0; c < brickColumnCount; c++) {
+      for (let r = 0; r < brickRowCount; r++) {
+        const currentBrick = allBricks[c][r]
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) 
+        continue;
+        const clipX = currentBrick.color * 32
+        ctx.drawImage(
+          bricks,
+          clipX,
+          0,
+          31,
+          14,
+          currentBrick.x,
+          currentBrick.y,
+          brickWidth,
+          brickHeight
+        )
+      }
+    }
+  }
 
-  function collisionDetection() {}
+  function collisionDetection() {
+    for (let c = 0; c < brickColumnCount; c++) {
+      for (let r = 0; r < brickRowCount; r++) {
+        const currentBrick = allBricks[c][r]
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) 
+        continue;
+        
+        const isBallSameXAsBrick = x > currentBrick.x && x < currentBrick.x + brickWidth
+        const isBallTouchingBrick = y > currentBrick.y && y < currentBrick.y + brickHeight
+
+        if (isBallSameXAsBrick && isBallTouchingBrick) {
+          dy = -dy
+          currentBrick.status = BRICK_STATUS.DESTROYED
+        }
+      }
+    }
+  }
   function ballMovement() {
     // colisiones de los laterales
     if (
@@ -62,17 +157,61 @@
       dx = -dx
     }
     // colision en el techo
+    if (y + dy < ballRadius) {
+      dy = -dy
+    }
+    // colision con la pala
+    const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth
+    const isBallTouchingPaddle = y + dy > paddleY
+    if (isBallSameXAsPaddle && isBallTouchingPaddle) {
+      dy = -dy
+    } else if (y + dy > canvas.height) {// game over
+      gameOver = true
+      console.log('Game Over');
+    }
     x += dx
     y += dy
 
   }
-  function paddleMovement() {}
+  function paddleMovement() {
+    if (rightPressed && paddleX < canvas.width - paddleWidth) {
+      paddleX += PADDLE_SENSITIVITY
+    } else if (leftPressed && paddleX > 0) {
+      paddleX -= PADDLE_SENSITIVITY
+    }
+  }
 
   function cleanCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
 
+  function initEvents() {
+    console.log('init');
+    document.addEventListener('keydown', keyDownHandler)
+    document.addEventListener('keyup', keyUpHandler)
+
+    function keyDownHandler(event) {
+      const { key } = event
+      if (key === 'Right' || key === 'ArrowRight') {
+        rightPressed = true
+      } else if (key === 'Left' || key === 'ArrowLeft') {
+        leftPressed = true
+      }
+    }
+    function keyUpHandler(event) {
+      const { key } = event
+      if (key === 'Right' || key === 'ArrowRight') {
+        rightPressed = false
+      } else if (key === 'Left' || key === 'ArrowLeft') {
+        leftPressed = false
+      }
+    }
+  }
   function draw() {
+    if (gameOver) {
+      location.reload()
+      return
+    }
     cleanCanvas()
     // elementos
     drawBall()
@@ -87,5 +226,6 @@
     window.requestAnimationFrame(draw)
   }
   draw()
+  initEvents()
 </script>
 </html>
