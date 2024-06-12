@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>chatGPT-local</title>
+  <style>
+    * {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    body {
+      background: #f5f5f5;
+      color: #111;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      display: grid;
+      place-content: center;
+      height: 100dvh;
+      font-weight: 500;
+    }
+    main {
+      width: 400px;
+      max-width: 100%;
+      height: 70vh;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      padding: 10px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      box-sizing: border-box;
+    }
+    ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+
+      > .role {
+        width: max-content;
+        height: 30px;
+        padding: 0 10px;
+        background: #eee;
+        border-radius: 10px;
+        font-weight: 700;
+        text-align: center;
+        line-height: 30px;
+        color: #333;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      > .content {
+        padding: 10px;
+        margin: 0;
+      }
+
+      &.user {
+        align-self: flex-end;
+        align-items: flex-end;
+        max-width: 80%;
+        > .content {
+          background-color: #dadada;
+          border-radius: 10px;
+        }
+      }
+
+      &.bot {
+        align-self: flex-start;
+        max-width: 80%;
+        > .content {
+          background-color: #e7e5e5;
+          border-radius: 10px;
+        }
+      }
+    }
+    form {
+      display: flex;
+      margin: 20px 0;
+      input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        font-size: 16px;
+        margin-right: 10px;
+        outline: none;
+        transition: border-color 0.2s ease;
+
+        &:hover {
+          border-color: #999;
+        }
+
+        &:focus {
+          border-color: #666;
+          box-shadow: 0 0 2px #666;
+        }
+      }
+      button {
+        padding: 8px 16px;
+        background: #666;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: #555;
+        }
+
+        &:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
+      }
+    }
+    small {
+      font-size: 12px;
+      color: #222;
+      position: fixed;
+      bottom: 50px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      margin: auto;
+      max-width: 400px;
+    }
+  </style>
+  <script type="module">
+    import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+    /* custom jquery */
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => document.querySelectorAll(selector);
+
+    const SELECTED_MODEL = 'TinyLlama-1.1B-Chat-v0.4-q4f16_1-MLC-1k';
+
+    const info = $('small');
+    const button = $('button');
+
+    const engine = await CreateMLCEngine(SELECTED_MODEL, {
+      initProgressCallback: (progress) => {
+        console.log(progress);
+        info.textContent = progress.text;
+        if (progress.progress == 1) {
+          button.removeAttribute('disabled');
+        }
+      },
+    });
+
+    const form = $('form');
+    const input = $('input');
+    const messages = $('ul');
+    const container = $('main');
+    const template = $('#message-template')
+
+    let messagesChat = []
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const messageText = input.value.trim();
+      if (messageText) {
+        addMessage(messageText, 'user');
+        input.value = '';
+        button.setAttribute('disabled', 'disabled');
+
+        const userMessage = {
+          role: 'user', 
+          content: messageText
+        }
+        messagesChat.push(userMessage)
+        const chunks = await engine.chat.completions.create({
+          messages: [
+            ...messagesChat, 
+            userMessage
+          ],
+          stream: true
+        })
+
+        let reply = ''
+        
+        let botMessage = addMessage('', 'bot')
+
+        for await (const chunk of chunks) {
+          const [choice] = chunk.choices
+          const content = choice?.delta?.content ?? '' 
+          reply += content
+          botMessage.textContent = reply
+        }
+
+        button.removeAttribute('disabled');
+        messagesChat.push({
+          role: 'bot', 
+          content: reply
+        })
+        /* const botMessage = {
+          role: 'bot', 
+          content: reply.choices[0].message.content
+        }
+        addMessage(reply.choices[0].message.content, 'bot'); */
+      }
+    });
+
+    function addMessage(text, role) {
+      // clone the template
+      const clonedTemplate = template.content.cloneNode(true);
+      const newMessage = clonedTemplate.querySelector('.message')
+
+      const who = newMessage.querySelector('.role')
+      const content = newMessage.querySelector('.content')
+
+      who.textContent = role === 'user' ? 'Tú' : 'GPT-local';
+      content.textContent = text;
+
+      newMessage.classList.add(role);
+
+      messages.appendChild(newMessage);
+
+      container.scrollTop = container.scrollHeight;
+
+      return content
+    }
+  </script>
+</head>
+<body>
+  <main>
+    <ul>
+      
+    </ul>
+  </main>
+  <form>
+    <input placeholder="Escribe tu pregunta aquí...">
+    <button disabled>Enviar</button>
+  </form>
+
+  <small>&nbsp;</small>
+
+  <template id="message-template">
+    <li class="message">
+      <span class="role"></span>
+      <p class="content"></p>
+    </li>
+  </template>
+</body>
+</html>
