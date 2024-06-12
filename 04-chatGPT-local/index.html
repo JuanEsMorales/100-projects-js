@@ -208,6 +208,7 @@
             const content = choice?.delta?.content ?? ""
             reply += content
             botMessage.textContent = reply
+            container.scrollTop = container.scrollHeight
           }
 
           button.removeAttribute("disabled")
@@ -215,7 +216,6 @@
             role: "assistant",
             content: reply,
           })
-          container.scrollTop = container.scrollHeight
           /* const botMessage = {
           role: 'bot', 
           content: reply.choices[0].message.content
