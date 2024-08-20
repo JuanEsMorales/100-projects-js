@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spreadsheet.js</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      color: #212121;
+    }
+    h1 {
+      font-size: 1rem;
+    }
+    header {
+      display: flex;
+      align-items: start;
+      justify-content: start;
+      margin: .5rem;
+    }
+    table {
+      border-collapse: collapse;
+      font-size: 10px;
+      margin-left: 10px;
+    }
+    thead th {
+      border: 1px solid #ccc;
+      font-weight: normal;
+      width: 64px;
+
+      &:first-child {
+        width: 30px;
+      }
+    }
+    td {
+      border: 1px solid #ccc;
+      text-align: center;
+      position: relative;
+
+      &:first-child {
+        padding-block: 5px;
+      }
+    }
+    input {
+      height: 100%;
+      width: 100%;
+      opacity: 0;
+      border: 0;
+      border-radius: 2px;
+      pointer-events: none;
+      &:focus {
+        opacity: 1;
+        outline: 2px solid #494;
+      }
+    }
+    span, input {
+      position: absolute;
+      inset: 0;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .selected {
+      background-color: #00ff5541;
+      border-color: #00ff55;
+      color: #000;
+    }
+  </style>
+  <script type="module">
+    const $ = (el) => document.querySelector(el)
+    const $$ = (el) => document.querySelectorAll(el)
+    const table = $('table')
+    const thead = $('thead')
+    const tbody = $('tbody')
+
+    const ROWS = 10
+    const COLS = 3
+    const FIRST_CHAR_CODE = 65
+
+    let selectedColumn = null
+
+    const range = length => Array.from({ length }, (_, i) => i)
+    const getColumnLetter = column => String.fromCharCode(FIRST_CHAR_CODE + column)
+    
+    let STATE = range(COLS).map(i => range(ROWS).map(j => ({ computedValue: '', value: '' })))    
+
+    const createTable = () => {
+      const headerHTML = `
+        <tr>
+          <th></th>
+          ${range(COLS).map(i => `<th>${getColumnLetter(i)}</th>`).join('')}
+        </tr>
+      `
+      thead.innerHTML = headerHTML
+
+      const bodyHTML = range(ROWS).map(row => `
+        <tr>
+          <td>${row + 1}</td>
+          ${range(COLS).map(column => `
+            <td data-x="${column}" data-y="${row}">
+              <span>${STATE[column][row].computedValue}</span>
+              <input type="text" value="${STATE[column][row].value}" />
+            </td>
+            `).join('')}
+        </tr>`).join('')
+      tbody.innerHTML = bodyHTML
+    }
+    function generateCellsConstants(cells) {
+      return cells.map((rows, x) => {
+        return rows.map((cell, y) => {
+          const letter = getColumnLetter(x)
+          const cellId = `${letter}${y + 1}`
+          const cValue = Number(cell.computedValue)
+          
+          return `const ${cellId} = ${!cValue || typeof cValue !== 'number' ? 0 : cValue};`
+        }).join('\n')
+      }).join('\n')
+    }
+
+    function computeAllCells(cells, constants) {
+      cells.forEach((rows, x) => {
+        rows.forEach((cell, y) => {
+          const computedValue = computeValue(cell.value, constants)
+          cell.computedValue = computedValue
+        })
+      })
+    }
+
+    function computeValue(value, constants) {
+      if (typeof value !== 'string' || !value.startsWith('=')) return value
+      const formula = value.slice(1)
+      
+      try {
+        const result = new Function(`
+          ${constants}
+          return ${formula}
+        `)();
+        return result;
+      } catch (e) {
+        console.error(e.message);
+        return '!ERROR ⚠';
+      }
+    }
+
+    const updateState = (x, y, value) => {
+      const newState = structuredClone(STATE)
+      const constants = generateCellsConstants(newState)
+      const cell = newState[x][y]
+      cell.value = value
+      cell.computedValue = computeValue(value, constants)
+      newState[x][y] = cell
+      
+      computeAllCells(newState, generateCellsConstants(newState))
+      STATE = newState
+
+      createTable()
+    }
+
+    tbody.addEventListener('click', e => {
+      const target = e.target
+      const td = target.closest('td')
+      const input = td?.querySelector('input')
+      const span = td?.querySelector('span')
+      if (!td || !input || !span) return
+      const { x, y } = td.dataset
+      
+      const end = input.value.length
+      input.setSelectionRange(end, end)
+      input.focus()
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur()
+      })
+      input.addEventListener('blur', () => {
+        const value = input.value
+        const stateValue = STATE[x][y].value
+
+        
+        if (value === stateValue) return
+        updateState(x, y, value)
+      }, { once: true })
+    })
+
+    thead.addEventListener('click', e => {
+      const { target } = e
+      const th = target.closest('th')
+      if (!th) return
+
+      const x = [...th.parentNode.children].indexOf(th)
+      if (x === -1) return
+
+      selectedColumn = x - 1
+
+      $$('.selected').forEach(el => el.classList.remove('selected'))
+
+      th.classList.add('selected')
+      $$(`tr td:nth-child(${x + 1})`).forEach(td => td.classList.add('selected'))
+    })
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && selectedColumn !== null) {
+        range(ROWS).forEach(row => {
+          updateState(selectedColumn, row, '')
+        })
+        selectedColumn = null
+        createTable()
+      }
+    })
+
+    document.addEventListener('copy', e => {
+      if (selectedColumn === null) return
+      const columnValues = range(ROWS).map(row => STATE[selectedColumn][row].value)
+      e.clipboardData.setData('text/plain', columnValues.join('\n'))
+      e.preventDefault()
+    })
+
+    document.addEventListener('click', (e) => {
+      if (e.target.matches('th')) return
+      if (selectedColumn !== null) {
+        $$('.selected').forEach(el => el.classList.remove('selected'))
+        selectedColumn = null
+      }
+    })
+    createTable()
+  </script>
+</head>
+<body>
+  <header>
+    <img src="https://static.vecteezy.com/system/resources/previews/027/179/355/original/google-sheet-spreadsheet-icon-logo-symbol-free-png.png" alt="Spreadsheet icon" width="30">
+    <h1>Spreadsheet.js</h1>
+  </header>
+  <main>
+    <table>
+      <thead>
+
+      </thead>
+      <tbody>
+
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>
