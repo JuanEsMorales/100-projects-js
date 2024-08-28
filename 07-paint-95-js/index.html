@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="./icon.png" type="image/png">
+  <title>Paint 95</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0 auto;
+      padding: 16px;
+      background-color: #222;
+      font-family: Arial, Helvetica, sans-serif;
+      max-width: 500px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+
+      & h1 {
+        background: linear-gradient(to right, red, #48c400, #008cff, violet);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: 16px;
+      }
+    }
+
+    .header__tools {
+      background-color: silver;
+      padding: 5px;
+      grid-area: header;
+
+      & button {
+        border: 0;
+        background-color: transparent;
+        padding: 2px 4px;
+
+        &:hover {
+          box-shadow: 
+            1px 1px black,
+            inset -1px -1px gray,
+            inset 1px 1px white;
+        }
+      }
+    }
+
+    main {
+      padding: 16px;
+      grid-area: main;
+    }
+
+    #canvas {
+      border: 1px solid #000;
+      background-color: #fff;
+    }
+
+    .footer {
+      background-color: silver;
+      padding: 5px;
+      grid-area: footer;
+    }
+
+    .container {
+      border: 1px solid silver;
+      display: grid;
+      grid-template-areas: 
+      "header header header"
+      "aside main main"
+      "footer footer footer";
+    }
+
+    aside {
+      background-color: silver;
+      width: 52px;
+      grid-area: aside;
+
+      & .container__btns {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+
+        & button {
+          width: 24px;
+          height: 24px;
+          border: 2px solid #eee;
+          border-bottom-color: #000;
+          border-right-color: #000;
+          
+          background-color: transparent;
+          background: url(./icons/draw.png) no-repeat center;
+          image-rendering: pixelated;
+
+          &.active {
+            border: 2px solid #000;
+            border-bottom-color: #eee;
+            border-right-color: #eee;
+          }
+        }
+
+        & #btn-clear {
+          background: url(./icons/trash.png) no-repeat center;
+          background-size: 20px;
+        }
+
+        & #btn-erase {
+          background: url(./icons/erase.png) no-repeat center;
+        }
+
+        & #btn-picker {
+          background: url(./icons/picker.png) no-repeat center;
+        }
+
+        & #btn-rectangle {
+          background: url(./icons/rectangle.png) no-repeat center;
+        }
+
+        & #btn-ellipsis {
+          background: url(./icons/ellipse.png) no-repeat center;
+        }
+      }
+    }
+  </style>
+  <script type="module">
+    // Constants
+    const MODES = {
+      DRAW: 'draw',
+      ERASE: 'erase',
+      RECTANGLE: 'rectangle',
+      ELLIPSIS: 'ellipsis',
+      PICKER: 'picker'
+    }
+
+    // Helpers
+    const $ = el => document.querySelector(el);
+    const $$ = el => document.querySelectorAll(el);
+
+    // Elements
+    const canvas = $('#canvas');
+    const ctx = canvas.getContext('2d');
+    const colorPicker = $('#color-picker');
+    const clearBtn = $('#btn-clear');
+    const drawBtn = $('#btn-draw');
+    const rectangleBtn = $('#btn-rectangle');
+
+    // State
+    let isDrawing = false;
+    let startX, startY;
+    let lastX = 0;
+    let lastY = 0;
+    let mode = MODES.DRAW // erase, rectangle, circle, line, ellipsis, picker
+
+    // Events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+
+    colorPicker.addEventListener('change', setColor);
+
+    clearBtn.addEventListener('click', clearCanvas);
+    rectangleBtn.addEventListener('click', () => setMode(MODES.RECTANGLE));
+    drawBtn.addEventListener('click', () => setMode(MODES.DRAW));
+    // Methods
+    function startDrawing(e) {
+      isDrawing = true;
+      const { offsetX, offsetY } = e;
+
+      [startX, startY] = [offsetX, offsetY];
+      [lastX, lastY] = [offsetX, offsetY];      
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      const { offsetX, offsetY } = e;
+
+      if (mode === MODES.RECTANGLE) {
+        const width = offsetX - startX;
+        const height = offsetY - startY;
+
+        ctx.beginPath();
+        ctx.rect(startX, startY, width, height);
+        ctx.stroke();
+
+        return;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+
+      ctx.lineTo(offsetX, offsetY);
+      ctx.stroke();
+
+      [lastX, lastY] = [offsetX, offsetY];
+    }
+
+    function stopDrawing(e) {
+      isDrawing = false;
+      ctx.closePath();
+    }
+
+    function setColor() {
+      ctx.strokeStyle = colorPicker.value;
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+
+      $('.container__btns button.active').classList.remove('active');
+
+      if (mode === MODES.DRAW) {
+        drawBtn.classList.add('active');
+        canvas.style.cursor = 'crosshair';
+        return
+      } 
+      
+      if (mode === MODES.RECTANGLE) {
+        rectangleBtn.classList.add('active');
+        canvas.style.cursor = 'sw-resize';
+        return
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="header">
+    <img src="./icon.png" alt="Paint 95" width="30" height="30" /> 
+    <h1>
+      Paint 95
+    </h1>
+  </header>
+
+  <div class="container">
+    <header class="header__tools">
+      <button>File</button>
+      <button>Edit</button>
+      <button>View</button>
+      <button>Image</button>
+      <button>Options</button>
+      <button>Help</button>
+    </header>
+    <aside>
+      <div class="container__btns">
+        <button id="btn-draw" class="active" title="Pincel"></button>
+        <button id="btn-erase" title="Borrar"></button>
+        <button id="btn-rectangle" title="Rectángulo"></button>
+        <button id="btn-ellipsis" title="Elipse"></button>
+        <button id="btn-picker" title="Seleccionar color"></button>
+        <button id="btn-clear" title="Limpiar"></button>
+      </div>
+    </aside>
+    <main>
+      <canvas id="canvas" width="300" height="200"></canvas>
+    </main>
+    <footer class="footer">
+      <input type="color" id="color-picker" value="#000" />
+    </footer>
+  </div>
+</body>
+</html>
