@@ -47,6 +47,12 @@
             inset -1px -1px gray,
             inset 1px 1px white;
         }
+        &:active {
+          box-shadow: 
+            1px 1px white,
+            inset -1px -1px gray,
+            inset 1px 1px black;
+        }
       }
     }
 
@@ -101,6 +107,11 @@
             border-bottom-color: #eee;
             border-right-color: #eee;
           }
+
+          &:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+          }
         }
 
         & #btn-clear {
@@ -147,6 +158,10 @@
     const clearBtn = $('#btn-clear');
     const drawBtn = $('#btn-draw');
     const rectangleBtn = $('#btn-rectangle');
+    const eraseBtn = $('#btn-erase');
+    const lineWidth = $('#line-width');
+    const lineWidthValue = $('#line-width-value');
+    const pickerBtn = $('#btn-picker');
 
     // State
     let isDrawing = false;
@@ -154,6 +169,8 @@
     let lastX = 0;
     let lastY = 0;
     let mode = MODES.DRAW // erase, rectangle, circle, line, ellipsis, picker
+    let imageData;
+    let isShftPressed = false;
 
     // Events
     canvas.addEventListener('mousedown', startDrawing);
@@ -166,13 +183,26 @@
     clearBtn.addEventListener('click', clearCanvas);
     rectangleBtn.addEventListener('click', () => setMode(MODES.RECTANGLE));
     drawBtn.addEventListener('click', () => setMode(MODES.DRAW));
+    eraseBtn.addEventListener('click', () => setMode(MODES.ERASE));
+    pickerBtn.addEventListener('click', () => setMode(MODES.PICKER));
+
+    lineWidth.addEventListener('input', setLineWidth);
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
     // Methods
+    function setLineWidth() {
+      ctx.lineWidth = lineWidth.value;
+      lineWidthValue.innerText = lineWidth.value;
+    }
     function startDrawing(e) {
       isDrawing = true;
       const { offsetX, offsetY } = e;
 
       [startX, startY] = [offsetX, offsetY];
-      [lastX, lastY] = [offsetX, offsetY];      
+      [lastX, lastY] = [offsetX, offsetY];
+      
+      imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     }
 
     function draw(e) {
@@ -180,8 +210,17 @@
       const { offsetX, offsetY } = e;
 
       if (mode === MODES.RECTANGLE) {
-        const width = offsetX - startX;
-        const height = offsetY - startY;
+        ctx.putImageData(imageData, 0, 0);
+
+        let width = offsetX - startX;
+        let height = offsetY - startY;
+
+        if (isShftPressed) {
+          const sideLength = Math.min(Math.abs(width), Math.abs(height));
+
+          width = width > 0 ? sideLength : -sideLength;
+          height = height > 0 ? sideLength : -sideLength;
+        }
 
         ctx.beginPath();
         ctx.rect(startX, startY, width, height);
@@ -190,6 +229,7 @@
         return;
       }
 
+
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
 
@@ -197,6 +237,14 @@
       ctx.stroke();
 
       [lastX, lastY] = [offsetX, offsetY];
+    }
+
+    function handleKeyDown({ key }) {
+      isShftPressed = key === 'Shift';
+    }
+
+    function handleKeyUp({ key }) {
+      if (key === 'Shift') isShftPressed = false;
     }
 
     function stopDrawing(e) {
@@ -212,22 +260,55 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
 
-    function setMode(newMode) {
+    async function setMode(newMode) {
+      let previousMode = mode;
       mode = newMode;
 
-      $('.container__btns button.active').classList.remove('active');
+      $('.container__btns button.active')?.classList.remove('active');
 
       if (mode === MODES.DRAW) {
         drawBtn.classList.add('active');
         canvas.style.cursor = 'crosshair';
+        ctx.globalCompositeOperation = 'source-over';
         return
       } 
       
       if (mode === MODES.RECTANGLE) {
         rectangleBtn.classList.add('active');
         canvas.style.cursor = 'sw-resize';
+        ctx.globalCompositeOperation = 'source-over';
         return
       }
+
+      if (mode === MODES.ERASE) {
+        eraseBtn.classList.add('active');
+        canvas.style.cursor = 'url(./icons/cursor-eraser.png) 0 24, auto';
+        ctx.globalCompositeOperation = 'destination-out';
+        return
+      }
+
+      if (mode === MODES.PICKER) {
+        pickerBtn.classList.add('active');
+
+        const eyeDropper = new window.EyeDropper();
+        try {
+          const { sRGBHex } = await eyeDropper.open();
+          colorPicker.value = sRGBHex;
+          setColor();
+          setMode(previousMode)
+        } catch (error) {
+          // Isn't necessary to handle this error
+        }
+        return
+      }
+    }
+
+    // Init mode
+    setMode(MODES.DRAW);
+
+    // show picker btn if browser supports it
+    if (typeof window.EyeDropper !== 'undefined') {
+      pickerBtn.disabled = false;
     }
   </script>
 </head>
@@ -250,19 +331,21 @@
     </header>
     <aside>
       <div class="container__btns">
-        <button id="btn-draw" class="active" title="Pincel"></button>
+        <button id="btn-draw" title="Pincel"></button>
         <button id="btn-erase" title="Borrar"></button>
         <button id="btn-rectangle" title="Rectángulo"></button>
         <button id="btn-ellipsis" title="Elipse"></button>
-        <button id="btn-picker" title="Seleccionar color"></button>
+        <button disabled id="btn-picker" title="Seleccionar color"></button>
         <button id="btn-clear" title="Limpiar"></button>
       </div>
     </aside>
     <main>
-      <canvas id="canvas" width="300" height="200"></canvas>
+      <canvas id="canvas" width="380" height="200"></canvas>
     </main>
     <footer class="footer">
-      <input type="color" id="color-picker" value="#000" />
+      <input type="color" id="color-picker" value="#000000" />
+      <input type="range" id="line-width" min="1" max="20" value="1" />
+      <output><span id="line-width-value">1</span>PX</output>
     </footer>
   </div>
 </body>
