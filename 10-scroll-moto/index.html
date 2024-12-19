@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moto scroll</title>
+  <style>
+    header {
+      background: linear-gradient(40deg, #ac7000, #bb0000 40%);
+      width: 500px;
+      height: 500px;  
+      border-radius: 100%;
+      position: absolute;
+      top: 0;
+      left: calc(50% - 250px);
+      transform: translateY(-100%);
+      opacity: 0;
+      margin-top: -360px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      animation: slideInDown 1s ease-in-out forwards;
+
+      img {
+        width: auto;
+        height: 45px;
+        margin-bottom: 70px;
+      }
+    }
+
+    main {
+      height: 300vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Arial', sans-serif;
+      font-size: 2rem;
+
+      #img {
+        width: 100vw;
+        height: 100dvh;
+        position: fixed;
+        object-fit: cover;
+        top: 0;
+        left: 0;
+        z-index: -1;
+      }
+    }
+
+    @keyframes slideInDown {
+      80% {
+        opacity: .7;
+      }
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+  </style>
+  <script type="module">
+    import { images } from './images.js'
+
+    const main = document.querySelector('main')
+    const MAX_FRAMES = 151
+    let currentFrame = 0
+
+    // Altura máxima del scroll
+    let maxScroll = document.documentElement.scrollHeight - window.innerHeight
+
+    window.addEventListener('resize', () => {
+      maxScroll = document.documentElement.scrollHeight - window.innerHeight      
+    });
+
+    const img = document.createElement('img')
+    img.id = 'img'
+    updateFrame(currentFrame, img)
+
+    main.appendChild(img)
+
+    let lastFrameUpdate = 0
+
+    window.addEventListener('scroll', () => {
+      if (Date.now() - lastFrameUpdate < 15) return true
+
+      lastFrameUpdate = Date.now()
+      const scroll = window.scrollY
+
+      // porcentaje de scroll
+      const scrollFraction = scroll / maxScroll
+
+      // frame actual
+      const frame = Math.floor(scrollFraction * MAX_FRAMES)
+
+      if (frame !== currentFrame) {
+        currentFrame = frame
+        updateFrame(frame, img)
+      }
+    })
+
+    function updateFrame(frame = 0, img) {
+      const src = images[frame].p
+      img.src = src
+    }
+  </script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="/logo.png" alt="Ichiban - Your way to freedom">
+    </header>
+  </main>
+</body>
+</html>
