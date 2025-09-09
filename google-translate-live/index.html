@@ -33,7 +33,7 @@
      <section class="language-selector">
         <div class="source-language">
           <select name="" id="sourceLanguage">
-            <option value="auto">Auto</option>
+            <option value="auto">Detectar idioma</option>
             <option value="es">Español</option>
             <option value="en">Inglés</option>
             <option value="fr">Francés</option>
@@ -51,7 +51,6 @@
         </button>
         <div class="target-language">
           <select name="" id="targetLanguage">
-            <option value="auto">Auto</option>
             <option value="es">Español</option>
             <option value="en">Inglés</option>
             <option value="fr">Francés</option>
@@ -64,6 +63,43 @@
         </div>
      </section>
     <!-- Textarea -->
+    <main class="translation-area">
+      <section class="input-section">
+        <div class="textarea-container">
+          <textarea 
+          id="inputText" 
+          placeholder="Introduce tu texto aquí..."
+          maxlength="5000"
+          ></textarea>
+          <!-- TODO: button para eliminar texto -->
+        </div>
+        <footer class="input-controls">
+          <button class="icon-button mic-button" id="micButton">
+            <span class="material-symbols-outlined">
+              mic
+            </span>
+          </button>
+        </footer>
+      </section>
+
+      <section class="output-section">
+        <div class="textarea-container">
+          <output id="outputText"></output>
+          <footer class="output-controls">
+          <button class="icon-button copy-button" id="copyButton">
+            <span class="material-symbols-outlined">
+              content_copy
+            </span>
+          </button>
+          <button class="icon-button speaker-button" id="speakerButton">
+            <span class="material-symbols-outlined">
+              volume_up
+            </span>
+          </button>
+        </footer>
+        </div>
+      </section>
+    </main>
   </div>
 </body>
 </html>
