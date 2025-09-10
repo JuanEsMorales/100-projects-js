@@ -73,6 +73,14 @@ class GoogleTranslate {
     this.swapLanguagesButton.addEventListener("click", () =>
       this.swapLanguages()
     )
+
+    this.micButton.addEventListener("click", () =>
+      this.startSpeechRecognition()
+    )
+
+    this.speakerButton.addEventListener("click", () =>
+      this.startSpeakTranslation()
+    )
   }
 
   debounce() {
@@ -165,8 +173,13 @@ class GoogleTranslate {
     }
   }
 
-  swapLanguages() {
+  async swapLanguages() {
+    if (this.sourceLanguageSelect.value === "auto") {
+     const detectedLanguage = await this.detectLanguage(this.inputTextArea.value)
+     this.sourceLanguageSelect.value = detectedLanguage
+    }
     const temporalLanguage = this.sourceLanguageSelect.value
+    
     this.sourceLanguageSelect.value = this.targetLanguageSelect.value
     this.targetLanguageSelect.value = temporalLanguage
 
@@ -176,6 +189,84 @@ class GoogleTranslate {
     if (this.inputTextArea.value.trim()) {
       this.updateTranslator()
     }
+  }
+
+  getFullLanguageCode(language) {
+    return GoogleTranslate.FULL_LANGUAGE_CODES[language] ?? GoogleTranslate.DEFAULT_SOURCE_LANGUAGE
+  }
+
+  async startSpeechRecognition() {
+    const hasNativeSpeechRecognition = "SpeechRecognition" in window || "webkitSpeechRecognition" in window
+    if (!hasNativeSpeechRecognition) {
+      console.warn("El navegador no soporta el reconocimiento de voz")
+      return
+    }
+
+    const SpeechRecognition = new window.SpeechRecognition()
+    const webkitSpeechRecognition = new window.webkitSpeechRecognition()
+
+    const recognition = SpeechRecognition ?? webkitSpeechRecognition
+
+    recognition.continuous = false
+    recognition.interimResults = false
+
+    const language = this.sourceLanguageSelect.value === "auto"
+        ? await this.detectLanguage(this.inputTextArea.value)
+        : this.sourceLanguageSelect.value
+
+    recognition.lang = this.getFullLanguageCode(language)
+    
+    recognition.onstart = () => {
+      this.micButton.style.backgroundColor = "var(--google-red)"
+      this.micButton.style.color = "white"
+    }
+
+    recognition.onend = () => {
+      this.micButton.style.backgroundColor = ""
+      this.micButton.style.color = ""
+    }
+
+    recognition.onresult = (event) => {
+      const [{ transcript }] = event.results[0]
+      this.inputTextArea.value = transcript
+      this.updateTranslator()
+    }
+
+    recognition.onerror = (event) => {
+      console.error("Error al reconocer el texto", event)
+    }
+
+    recognition.start()
+  }
+
+  startSpeakTranslation() {
+    const hasNativeSynthesis = "SpeechSynthesis" in window || "webkitSpeechSynthesis" in window
+    if (!hasNativeSynthesis) {
+      console.warn("El navegador no soporta la sintetización de voz")
+      return
+    }
+
+    const text = this.outputTextArea.value
+    if (!text.trim()) {
+      return
+    }
+
+    const utterance = new window.SpeechSynthesisUtterance(text)
+
+    utterance.lang = this.getFullLanguageCode(this.targetLanguageSelect.value)
+    utterance.rate = 0.8
+
+    utterance.onstart = () => {
+      this.speakerButton.style.backgroundColor = "var(--google-green)"
+      this.speakerButton.style.color = "white"
+    }
+
+    utterance.onend = () => {
+      this.speakerButton.style.backgroundColor = ""
+      this.speakerButton.style.color = ""
+    }
+
+    window.speechSynthesis.speak(utterance)
   }
 
   async detectLanguage(text) {
